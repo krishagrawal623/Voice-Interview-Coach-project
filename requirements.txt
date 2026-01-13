@@ -1,0 +1,6 @@
+# Added for Voice Interview Coach app
+streamlit
+sounddevice
+scipy
+openai-whisper
+vaderSentiment

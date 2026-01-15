@@ -9,7 +9,7 @@ import streamlit as st
 # --- Core functions imported from the logic module ---
 from voice_bot_core import (
     macos_say,
-    record_audio,
+    AudioRecorder,
     load_questions,
     transcribe_with_whisper,
     analyze_speech,
@@ -44,6 +44,8 @@ def run_interview(questions: List[str], seconds_per_answer: int, whisper_model: 
         st.session_state.q_index = 0
     if "history" not in st.session_state:
         st.session_state.history = []
+    if "recorder" not in st.session_state:
+        st.session_state.recorder = None
     st.session_state.total_q = len(questions)
 
     _hero()
@@ -77,18 +79,45 @@ def run_interview(questions: List[str], seconds_per_answer: int, whisper_model: 
     st.markdown(f"> {question}")
 
     # --- Controls: play TTS and record audio ---
-    col1, col2 = st.columns(2)
+    nav_col, col1, col2 = st.columns([0.35, 0.325, 0.325])
+    with nav_col:
+        can_go_prev = st.session_state.q_index > 0
+        if st.button("⬅️ Previous Question", use_container_width=True, disabled=not can_go_prev):
+            # Move back one question and drop the most recent answer (if any),
+            # so the user can re-record and re-analyze.
+            st.session_state.q_index = max(st.session_state.q_index - 1, 0)
+            if st.session_state.history:
+                st.session_state.history.pop()
+            st.rerun()
     with col1:
         if st.button("🔊 Start Question", use_container_width=True):
             macos_say(f"Question {st.session_state.q_index + 1}. {question}. You have {seconds_per_answer} seconds.")
             st.toast("Speaking question…")
     with col2:
-        if st.button("🎙️ Record Answer", type="primary", use_container_width=True):
+        is_recording = bool(getattr(st.session_state.recorder, "is_recording", False))
+        if not is_recording:
+            if st.button("🎙️ Start Recording", type="primary", use_container_width=True):
+                try:
+                    st.session_state.recorder = AudioRecorder(samplerate=16000)
+                    st.session_state.recorder.start(max_seconds=seconds_per_answer)
+                except Exception as e:
+                    st.error(f"Recording failed: {e}")
+                    return
+                st.toast("Recording started… Click ‘Stop Recording’ when you’re done.")
+                st.rerun()
+        else:
+            if not st.button("⏹️ Stop Recording", type="primary", use_container_width=True):
+                # Still recording; wait for user to stop.
+                st.info("Recording… click ‘Stop Recording’ to finish.")
+                return
+
             try:
-                audio_path, dur = record_audio(seconds=seconds_per_answer)
+                audio_path, dur = st.session_state.recorder.stop()
             except Exception as e:
                 st.error(f"Recording failed: {e}")
                 return
+            finally:
+                st.session_state.recorder = None
 
             # --- Transcription with Whisper ---
             with st.spinner("Transcribing answer with Whisper…"):
@@ -104,7 +133,7 @@ def run_interview(questions: List[str], seconds_per_answer: int, whisper_model: 
                         pass
 
             # --- Analysis + feedback rendering ---
-            metrics = analyze_speech(transcript, duration_seconds=float(seconds_per_answer))
+            metrics = analyze_speech(transcript, duration_seconds=float(dur))
             feedback = generate_feedback(metrics)
 
             st.markdown("\n")

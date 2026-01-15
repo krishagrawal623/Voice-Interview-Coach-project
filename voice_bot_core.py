@@ -3,7 +3,9 @@ import json
 import random
 import tempfile
 import subprocess
-from typing import List, Dict, Tuple
+import threading
+import time
+from typing import List, Dict, Tuple, Optional
 
 import numpy as np
 
@@ -30,6 +32,93 @@ def macos_say(text: str) -> None:
         subprocess.run(["say", text], check=False)
     except Exception:
         pass
+
+
+class AudioRecorder:
+    """Non-blocking audio recorder that can be stopped early.
+
+    Designed to be stored in Streamlit `st.session_state` and used across reruns.
+    """
+
+    def __init__(self, samplerate: int = 16000):
+        if sd is None or wav_write is None:
+            raise RuntimeError("sounddevice/scipy not available. Please install them.")
+        self.samplerate = int(samplerate)
+        self._stop_event = threading.Event()
+        self._lock = threading.Lock()
+        self._frames: List[np.ndarray] = []
+        self._stream: Optional["sd.InputStream"] = None
+        self._thread: Optional[threading.Thread] = None
+        self._started_at: Optional[float] = None
+        self._max_frames: Optional[int] = None
+
+    @property
+    def is_recording(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    def start(self, max_seconds: int = 30) -> None:
+        if self.is_recording:
+            return
+        self._stop_event.clear()
+        with self._lock:
+            self._frames = []
+        self._started_at = time.time()
+        self._max_frames = int(max(1, max_seconds) * self.samplerate)
+
+        def _callback(indata, frames, time_info, status):  # pragma: no cover
+            _ = (time_info, status)
+            if self._stop_event.is_set():
+                raise sd.CallbackStop()
+            with self._lock:
+                self._frames.append(indata.copy())
+                if self._max_frames is not None:
+                    total = sum(int(x.shape[0]) for x in self._frames)
+                    if total >= self._max_frames:
+                        raise sd.CallbackStop()
+
+        def _run():  # pragma: no cover
+            try:
+                with sd.InputStream(
+                    samplerate=self.samplerate,
+                    channels=1,
+                    dtype="float32",
+                    callback=_callback,
+                ):
+                    # Keep the thread alive until stop/max seconds.
+                    while not self._stop_event.is_set():
+                        time.sleep(0.05)
+            except Exception:
+                # Let caller handle failures when stopping (frames may be empty).
+                pass
+
+        self._thread = threading.Thread(target=_run, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> Tuple[str, float]:
+        """Stop recording and write WAV. Returns (wav_path, duration_seconds)."""
+        if not self.is_recording:
+            raise RuntimeError("Not recording.")
+
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join(timeout=5.0)
+
+        with self._lock:
+            if not self._frames:
+                raise RuntimeError("No audio captured. Check microphone permissions/input device.")
+            audio = np.concatenate(self._frames, axis=0)
+
+        audio = np.squeeze(audio)
+        max_abs = np.max(np.abs(audio)) or 1.0
+        audio_int16 = (audio / max_abs * 32767.0).astype(np.int16)
+
+        tmp_wav = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+        tmp_wav_path = tmp_wav.name
+        tmp_wav.close()
+        wav_write(tmp_wav_path, self.samplerate, audio_int16)
+
+        duration = float(audio_int16.shape[0]) / float(self.samplerate)
+        return tmp_wav_path, duration
 
 
 def record_audio(seconds: int = 10, samplerate: int = 16000) -> Tuple[str, float]:

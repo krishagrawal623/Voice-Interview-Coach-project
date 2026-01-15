@@ -16,15 +16,16 @@
 | | Hero/Header Section | ✅ Complete | `app_streamlit.py` | Title, subtitle, session metrics |
 | | Progress Indicator | ✅ Complete | `app_streamlit.py` | Progress bar showing interview completion |
 | | Question Display | ✅ Complete | `app_streamlit.py` | Shows current question with numbering |
-| | Control Buttons | ✅ Complete | `app_streamlit.py` | "Start Question" and "Record Answer" buttons |
+| | Control Buttons | ✅ Complete | `app_streamlit.py` | "Start Question", "Start/Stop Recording", and navigation controls |
+| | Previous Question Navigation | ✅ Complete | `app_streamlit.py` | Allows returning to the previous question and re-recording |
 | | Results Display | ✅ Complete | `app_streamlit.py` | Transcript, metrics, and feedback columns |
 | | Session Summary | ✅ Complete | `app_streamlit.py` | Expandable summary with all Q&A |
 | | Completion State | ✅ Complete | `app_streamlit.py` | End-of-interview view |
 | **Audio Functionality** | | | | |
-| | Audio Recording | ✅ Complete | `voice_bot_core.py` | Records audio using sounddevice |
+| | Audio Recording (Start/Stop) | ✅ Complete | `voice_bot_core.py` | Non-blocking recorder with early stop support |
 | | Audio Processing | ✅ Complete | `voice_bot_core.py` | Normalization and WAV file generation |
 | | Text-to-Speech | ✅ Complete | `voice_bot_core.py` | macOS `say` command for question narration |
-| | Recording Duration | ✅ Complete | `voice_bot_core.py` | Configurable recording time |
+| | Recording Duration | ✅ Complete | `app_streamlit.py`, `voice_bot_core.py` | Max recording time configurable; user can stop early |
 | **Speech Processing** | | | | |
 | | Whisper Integration | ✅ Complete | `voice_bot_core.py` | OpenAI Whisper transcription |
 | | Model Selection | ✅ Complete | `app_streamlit.py` | Support for tiny/base/small/medium models |
@@ -88,6 +89,7 @@
 |----------|------|---------|
 | `macos_say()` | `voice_bot_core.py` | Text-to-speech using macOS `say` command |
 | `record_audio()` | `voice_bot_core.py` | Records audio and saves as WAV file |
+| `AudioRecorder` | `voice_bot_core.py` | Start/stop recorder to allow stopping early |
 | `load_questions()` | `voice_bot_core.py` | Loads and randomizes questions from JSON |
 | `transcribe_with_whisper()` | `voice_bot_core.py` | Transcribes audio using Whisper model |
 | `analyze_speech()` | `voice_bot_core.py` | Analyzes speech: WPM, fillers, sentiment |
@@ -104,12 +106,12 @@
 1. **Initialization** → Load questions from JSON dataset
 2. **Configuration** → User sets questions count, duration, model in sidebar
 3. **Question Display** → Show current question with TTS option
-4. **Audio Recording** → User records answer (configurable duration)
+4. **Audio Recording** → User clicks Start Recording, then Stop Recording (or auto-stop at max time)
 5. **Transcription** → Whisper converts audio to text
-6. **Analysis** → Calculate WPM, filler words, sentiment
+6. **Analysis** → Calculate WPM, filler words, sentiment (using actual recorded duration)
 7. **Feedback** → Generate and display personalized feedback
 8. **History Storage** → Save Q&A to session state
-9. **Progress** → Advance to next question or show summary
+9. **Navigation** → User can go to Previous Question (re-record) or proceed forward
 10. **Completion** → Display full session summary
 
 ---
@@ -135,6 +137,8 @@ mainproject/
 ---
 
 *Implementation table for mainproject folder only*
+
+
 
 
 

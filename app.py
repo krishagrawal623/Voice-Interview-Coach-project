@@ -1,9 +1,6 @@
-# Voice Interview Coach - Streamlit UI layer
-# This file defines the user interface only. Core logic lives in voice_bot_core.py
-
 import os
-from typing import List, Dict
-
+import json
+from typing import List
 import streamlit as st
 
 # --- Core functions imported from the logic module ---
@@ -16,14 +13,16 @@ from voice_bot_core import (
     generate_feedback,
 )
 
-
 # --- UI: Hero/Header section ---
 def _hero() -> None:
     """Render the top header with title and a quick session stat."""
     left, right = st.columns([0.75, 0.25])
     with left:
         st.markdown("<h1 style='margin-bottom:0'>🗣️ Voice Interview Coach</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='color:#6b7280;margin-top:4px'>Practice interviews with real-time analysis of pace, clarity, and tone.</p>", unsafe_allow_html=True)
+        st.markdown(
+            "<p style='color:#6b7280;margin-top:4px'>Practice interviews with real-time analysis of pace, clarity, and tone.</p>",
+            unsafe_allow_html=True
+        )
     with right:
         st.metric("Session Questions", f"{st.session_state.get('total_q', 0)}")
 
@@ -37,9 +36,9 @@ def _progress(total: int, current: int) -> None:
     st.progress(pct, text=f"Progress: {current} / {total}")
 
 
-# --- UI: Main interview flow (question -> record -> results) ---
-def run_interview(questions: List[str], seconds_per_answer: int, whisper_model: str) -> None:
-    """Drive the on-page interview experience and render results for each answer."""
+# --- UI: Main interview flow ---
+def run_interview(questions: List[str], seconds_per_answer: int) -> None:
+    """Run the interview flow: question -> record -> transcribe -> analyze -> feedback."""
     if "q_index" not in st.session_state:
         st.session_state.q_index = 0
     if "history" not in st.session_state:
@@ -50,10 +49,9 @@ def run_interview(questions: List[str], seconds_per_answer: int, whisper_model: 
 
     _hero()
     _progress(len(questions), min(st.session_state.q_index, len(questions)))
-
     st.info("Click ‘Start Question’ to hear it, then ‘Record Answer’. We’ll transcribe and analyze automatically.")
 
-    # --- Completed state: show per-question summary ---
+    # --- Completed state ---
     if st.session_state.q_index >= len(questions):
         st.success("Interview complete.")
         if st.session_state.history:
@@ -68,31 +66,30 @@ def run_interview(questions: List[str], seconds_per_answer: int, whisper_model: 
                     st.markdown("**Transcript**")
                     st.write(item["transcript"] or "(No speech detected)")
                     st.markdown("**Feedback**")
-                    st.info(item["feedback"]) 
+                    st.info(item["feedback"])
         return
 
-    # --- Active question state ---
+    # --- Active question ---
     question = questions[st.session_state.q_index]
-
     st.markdown("---")
     st.subheader(f"Question {st.session_state.q_index + 1} of {len(questions)}")
     st.markdown(f"> {question}")
 
-    # --- Controls: play TTS and record audio ---
+    # --- Controls: play TTS and record ---
     nav_col, col1, col2 = st.columns([0.35, 0.325, 0.325])
     with nav_col:
         can_go_prev = st.session_state.q_index > 0
         if st.button("⬅️ Previous Question", use_container_width=True, disabled=not can_go_prev):
-            # Move back one question and drop the most recent answer (if any),
-            # so the user can re-record and re-analyze.
             st.session_state.q_index = max(st.session_state.q_index - 1, 0)
             if st.session_state.history:
                 st.session_state.history.pop()
             st.rerun()
+
     with col1:
         if st.button("🔊 Start Question", use_container_width=True):
             macos_say(f"Question {st.session_state.q_index + 1}. {question}. You have {seconds_per_answer} seconds.")
             st.toast("Speaking question…")
+
     with col2:
         is_recording = bool(getattr(st.session_state.recorder, "is_recording", False))
         if not is_recording:
@@ -107,7 +104,6 @@ def run_interview(questions: List[str], seconds_per_answer: int, whisper_model: 
                 st.rerun()
         else:
             if not st.button("⏹️ Stop Recording", type="primary", use_container_width=True):
-                # Still recording; wait for user to stop.
                 st.info("Recording… click ‘Stop Recording’ to finish.")
                 return
 
@@ -119,10 +115,10 @@ def run_interview(questions: List[str], seconds_per_answer: int, whisper_model: 
             finally:
                 st.session_state.recorder = None
 
-            # --- Transcription with Whisper ---
+            # --- Transcription ---
             with st.spinner("Transcribing answer with Whisper…"):
                 try:
-                    transcript = transcribe_with_whisper(audio_path, model_name=whisper_model)
+                    transcript = transcribe_with_whisper(audio_path)
                 except Exception as e:
                     st.error(f"Transcription failed: {e}")
                     return
@@ -132,11 +128,10 @@ def run_interview(questions: List[str], seconds_per_answer: int, whisper_model: 
                     except Exception:
                         pass
 
-            # --- Analysis + feedback rendering ---
+            # --- Analysis + feedback ---
             metrics = analyze_speech(transcript, duration_seconds=float(dur))
             feedback = generate_feedback(metrics)
 
-            st.markdown("\n")
             tcol, acol, fcol = st.columns([1, 1, 1])
             with tcol:
                 st.markdown("**📝 Transcript**")
@@ -146,43 +141,70 @@ def run_interview(questions: List[str], seconds_per_answer: int, whisper_model: 
                 c1, c2, c3 = st.columns(3)
                 c1.metric("WPM", f"{metrics['wpm']:.1f}")
                 c2.metric("Filler", f"{int(metrics['filler_count'])}")
-                c3.metric("Tone", metrics["sentiment_label"]) 
+                c3.metric("Tone", metrics["sentiment_label"])
             with fcol:
                 st.markdown("**💡 Feedback**")
                 st.info(feedback)
 
-            # --- Optional spoken feedback ---
+            # Optional spoken feedback
             macos_say("Here is your feedback.")
             macos_say(feedback)
 
-            # --- Save to session history and advance ---
+            # Save to history & advance
             st.session_state.history.append({
                 "question": question,
                 "transcript": transcript,
                 "metrics": metrics,
                 "feedback": feedback,
             })
-
             st.session_state.q_index += 1
             st.rerun()
 
 
-# --- App entrypoint + sidebar configuration ---
+# --- App entrypoint ---
 def main() -> None:
-    """Configure the page, render sidebar controls, and start the interview flow."""
     st.set_page_config(page_title="Voice Interview Coach", page_icon="🗣️", layout="wide")
 
+    dataset_path = os.path.join(os.path.dirname(__file__), "interview_question.json")
+
     with st.sidebar:
-        st.header("Settings")
-        dataset_path = os.path.join(os.path.dirname(__file__), "questions_dataset.json")
+        st.header("⚙️ Settings")
+
+        # Load JSON safely
+        try:
+            with open(dataset_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            st.error(f"Failed to load questions: {e}")
+            st.stop()
+
+        categories = ["mixed"] + list(data.keys())
+        category = st.selectbox("Interview Type", categories)
+
         num_questions = st.slider("Number of questions", 1, 10, 5)
         seconds_per_answer = st.slider("Seconds per answer", 5, 120, 30)
-        whisper_model = st.selectbox("Whisper model", ["tiny", "base", "small", "medium"], index=2)
         st.markdown("---")
-        st.caption("Tip: Allow microphone permissions if prompted.")
+        st.caption("© MADE BY KRISH")
 
-    questions = load_questions(dataset_path, num_questions=num_questions)
-    run_interview(questions, seconds_per_answer, whisper_model)
+    # Reset session if settings changed
+    if (
+        "prev_category" not in st.session_state
+        or st.session_state.prev_category != category
+        or "prev_num_questions" not in st.session_state
+        or st.session_state.prev_num_questions != num_questions
+    ):
+        st.session_state.q_index = 0
+        st.session_state.history = []
+        st.session_state.prev_category = category
+        st.session_state.prev_num_questions = num_questions
+
+    # Load questions based on selection
+    if category == "mixed":
+        questions = load_questions(dataset_path, None, num_questions)
+    else:
+        questions = load_questions(dataset_path, category, num_questions)
+
+    run_interview(questions, seconds_per_answer)
 
 
 if __name__ == "__main__":

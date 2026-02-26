@@ -1,0 +1,30 @@
+{
+  "hr": [
+    "Tell me about yourself.",
+    "Why do you want to work here?",
+    "What are your strengths and weaknesses?",
+    "Where do you see yourself in 5 years?",
+    "Why should we hire you?"
+  ],
+  "behavioral": [
+    "Describe a challenging situation and how you handled it.",
+    "Tell me about a time you failed.",
+    "Describe a time you worked in a team.",
+    "How do you handle conflict?",
+    "Tell me about a leadership experience."
+  ],
+  "technical": [
+    "Explain REST API.",
+    "What is multithreading?",
+    "Explain normalization in databases.",
+    "What is overfitting in ML?",
+    "Difference between list and tuple in Python?"
+  ],
+  "ml": [
+    "Explain bias-variance tradeoff.",
+    "What is gradient descent?",
+    "How does Random Forest work?",
+    "Explain cross-validation.",
+    "What is regularization?"
+  ]
+}

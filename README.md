@@ -4,7 +4,7 @@
 
 A **voice-based interview practice app** built with **Streamlit**, **OpenAI Whisper**, and **VADER sentiment analysis**.
 
-> ⚠️ **Note:** The live demo is a limited version. To record audio using your microphone, you need to **run the app locally**,because Streamlit Community Cloud cannot access the microphone with `sounddevice`.
+⚠️ Note: The live demo is a limited version. To record audio using your microphone, you need to **run the app locally**,because Streamlit Community Cloud cannot access the microphone with `sounddevice`.
 
 
 ## 📌 Features
@@ -17,14 +17,14 @@ A **voice-based interview practice app** built with **Streamlit**, **OpenAI Whis
 
 ## 🛠️ Installation (Local)
 
-1. **Clone the repository**
+1. Clone the repository
 
 ```bash
 git clone https://github.com/<your-username>/voice-interview-coach.git
 cd voice-interview-coach
 ```
 
-2. **Create a virtual environment (optional)**
+2. Create a virtual environment (optional)
 
 ```bash
 python -m venv venv
@@ -32,7 +32,7 @@ source venv/bin/activate   # Linux/Mac
 venv\Scripts\activate      # Windows
 ```
 
-3. **Install dependencies**
+3. Install dependencies**
 
 ```bash
 pip install -r requirements.txt
@@ -51,9 +51,7 @@ streamlit run app.py
 3. Whisper transcribes your answer to text.
 4. VADER analyzes sentiment and displays the result.
 
-> The live Streamlit Cloud demo only supports **audio playback**, not recording.
-
----
+ The live Streamlit Cloud demo only supports **audio playback**, not recording.
 
 ## 🧩 Requirements
 
@@ -69,7 +67,7 @@ vaderSentiment
 nltk
 ```
 
-> Make sure `sounddevice` and `scipy` are installed for local microphone recording.
+Make sure `sounddevice` and `scipy` are installed for local microphone recording.
 
 
 ## 📌 Project Structure
@@ -79,8 +77,8 @@ voice-interview-coach/
 ├─ requirements.txt          # Dependencies
 ├─ README.md                 # This documentation
 ├─ utils/                    
-│   ├─ voice_bot_core.py     # Core logic for voice interview processing
-│   └─ interviev_question.json        # Predefined questions or config file
+│   ├─ voice_bot_core.py         # Core logic for voice interview processing
+│   └─ interviev_question.json   # Predefined questions or config file
 ```
 
 ## 💡 Notes

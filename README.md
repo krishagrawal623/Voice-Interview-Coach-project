@@ -1,97 +1,173 @@
 # 🎙️ Voice Interview Coach
 
-**Live Demo (Cloud):** [https://voice-interview-coach.streamlit.app/](https://voice-interview-coach.streamlit.app/)
+**🌐 Live Demo:** https://voice-interview-coach.streamlit.app/
 
-A **voice-based interview practice app** built with **Streamlit**, **OpenAI Whisper**, and **VADER sentiment analysis**.
+A modern **AI-powered Voice Interview Coach** built with **Streamlit**, **OpenAI Whisper**, and **VADER Sentiment Analysis**. The application helps users practice technical and HR interviews by asking interview questions, recording spoken answers, transcribing speech, analyzing communication, and providing instant feedback.
 
-⚠️ Note: The live demo is a limited version. To record audio using your microphone, you need to **run the app locally**,because Streamlit Community Cloud cannot access the microphone with `sounddevice`.
+---
 
+# ✨ Features
 
-## 📌 Features
+* 🎤 Record interview answers directly from your browser
+* 🔊 Listen to interview questions using browser-compatible speech
+* 🧠 Automatic speech-to-text transcription using **OpenAI Whisper**
+* 📊 Analyze speaking performance
 
-* 🎤 Record interview answers locally
-* 🧠 Transcribe audio using **Whisper**
-* 📊 Analyze sentiment (positive/negative/neutral) with **VADER**
-* 💻 Clean Streamlit interface
-* ☁️ Cloud demo available for preview (playback only, no live recording)
+  * Words Per Minute (WPM)
+  * Filler Word Detection
+  * Sentiment Analysis
+* 💡 Personalized interview feedback
+* 📜 Session summary after interview completion
+* 🎯 Practice category-wise or mixed interview questions
+* ☁️ Fully compatible with Streamlit Community Cloud
 
-## 🛠️ Installation (Local)
+---
 
-1. Clone the repository
+# 🚀 Live Demo
+
+**Try the application here**
+
+https://voice-interview-coach.streamlit.app/
+
+---
+
+# 🛠️ Technologies Used
+
+* Python
+* Streamlit
+* OpenAI Whisper
+* VADER Sentiment Analysis
+* NumPy
+* Browser Audio Components
+* JSON
+
+---
+
+# 📦 Installation
+
+Clone the repository:
 
 ```bash
-git clone https://github.com/<your-username>/voice-interview-coach.git
-cd voice-interview-coach
+git clone https://github.com/krishagrawal623/Voice-Interview-Coach-project.git
+cd Voice-Interview-Coach-project
 ```
 
-2. Create a virtual environment (optional)
+Create a virtual environment:
+
+### macOS / Linux
 
 ```bash
-python -m venv venv
-source venv/bin/activate   # Linux/Mac
-venv\Scripts\activate      # Windows
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-3. Install dependencies
+### Windows
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 📦 Usage (Local)
+---
 
-Run the app locally to **record your voice and get full features**:
+# ▶️ Run the Application
 
 ```bash
 streamlit run app.py
 ```
 
-1. Click **Record** to capture your answer.
-2. Playback your recording.
-3. Whisper transcribes your answer to text.
-4. VADER analyzes sentiment and displays the result.
+The application will open in your browser.
 
- The live Streamlit Cloud demo only supports **audio playback**, not recording.
+---
 
-## 🧩 Requirements
+# 🎯 How It Works
+
+1. Select an interview category.
+2. Choose the number of questions.
+3. Click **Start Question**.
+4. Listen to the interview question.
+5. Record your spoken answer.
+6. Whisper converts your speech to text.
+7. The application analyzes:
+
+   * Speaking speed
+   * Filler words
+   * Sentiment
+8. Receive personalized interview feedback.
+9. Review your complete interview summary at the end.
+
+---
+
+# 📁 Project Structure
 
 ```text
-streamlit
-sounddevice
-scipy
-numpy
-soundfile
-torch
-openai-whisper
-vaderSentiment
-nltk
+Voice-Interview-Coach-project/
+│
+├── app.py
+├── voice_bot_core.py
+├── interview_question.json
+├── requirements.txt
+├── packages.txt
+├── README.md
+└── __pycache__/
 ```
 
-Make sure `sounddevice` and `scipy` are installed for local microphone recording.
+---
 
+# 📊 Analysis Performed
 
-## 📌 Project Structure
-```
-voice-interview-coach/
-├─ app.py                    # Main Streamlit app
-├─ requirements.txt          # Dependencies
-├─ README.md                 # This documentation
-├─ utils/                    
-│   ├─ voice_bot_core.py         # Core logic for voice interview processing
-│   └─ interviev_question.json   # Predefined questions or config file
-```
+The application evaluates:
 
-## 💡 Notes
+* ✅ Words Per Minute (Speaking Pace)
+* ✅ Filler Word Usage
+* ✅ Sentiment Analysis
+* ✅ Overall Communication Quality
 
-* Cloud demo is for **preview only**.
-* **Local setup is required** for microphone recording and full functionality.
-* Whisper downloads the model on first run — this may take a few minutes.
-* VADER lexicon is downloaded via NLTK if not already available.
+---
 
+# 📸 Features Included
 
-## 🌟 Future Improvements
+* Browser-based Voice Recording
+* Speech-to-Text using Whisper
+* Sentiment Analysis using VADER
+* Automatic Feedback Generation
+* Progress Tracking
+* Session History
+* Interactive Streamlit Interface
 
-* Filler word detection (`um`, `ah`)
-* Speaking speed analysis
-* History tracking and dashboard
-* Role-based question practice
+---
+
+# 🌟 Future Improvements
+
+* AI-generated interview feedback using Large Language Models
+* Resume-based personalized interview questions
+* Difficulty levels (Beginner, Intermediate, Advanced)
+* PDF Interview Report
+* Interview Score Dashboard
+* Authentication and User Profiles
+* Interview History Database
+* Multi-language Interview Support
+* Performance Analytics
+
+---
+
+# 👨‍💻 Developer
+
+**Krish Agrawal**
+
+* GitHub: https://github.com/krishagrawal623
+* LinkedIn: https://www.linkedin.com/in/krishagrawal75/
+
+---
+
+# ⭐ Support
+
+If you found this project helpful, consider giving it a ⭐ on GitHub.
+
+Contributions, suggestions, and feedback are always welcome!

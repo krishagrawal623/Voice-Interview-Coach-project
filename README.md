@@ -1,7 +1,5 @@
 # 🎙️ Voice Interview Coach
 
-**🌐 Live Demo:** https://voice-interview-coach.streamlit.app/
-
 A modern **AI-powered Voice Interview Coach** built with **Streamlit**, **OpenAI Whisper**, and **VADER Sentiment Analysis**. The application helps users practice technical and HR interviews by asking interview questions, recording spoken answers, transcribing speech, analyzing communication, and providing instant feedback.
 
 ---
@@ -27,7 +25,7 @@ A modern **AI-powered Voice Interview Coach** built with **Streamlit**, **OpenAI
 
 **Try the application here**
 
-https://voice-interview-coach.streamlit.app/
+https://voice-interview-bot.streamlit.app/
 
 ---
 

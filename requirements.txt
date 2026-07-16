@@ -1,6 +1,21 @@
-# Added for Voice Interview Coach app
-streamlit
-sounddevice
-scipy
-openai-whisper
-vaderSentiment
+# Voice Interview Coach — Streamlit Community Cloud dependencies
+# ---------------------------------------------------------------
+# Install locally:  pip install -r requirements.txt
+# ---------------------------------------------------------------
+
+# Core Streamlit
+streamlit>=1.32.0
+
+# Browser microphone recording (replaces sounddevice + pyaudio)
+streamlit-mic-recorder>=0.0.8
+
+# Whisper speech-to-text (CPU-only version, no CUDA required)
+openai-whisper>=20231117
+
+# Required by Whisper
+torch
+numpy<2.0
+ffmpeg-python
+
+# Sentiment analysis
+vaderSentiment>=3.3.2

@@ -1,22 +1,9 @@
-import os
 import json
 import random
-import tempfile
-import subprocess
-import threading
-import time
 import re
-from typing import List, Dict, Tuple, Optional
-
-import numpy as np
-
-# --- Audio libraries ---
-try:
-    import sounddevice as sd
-    from scipy.io.wavfile import write as wav_write
-except Exception:
-    sd = None
-    wav_write = None
+import tempfile
+import io
+from typing import List, Dict, Optional
 
 # --- Whisper ---
 try:
@@ -24,112 +11,26 @@ try:
 except Exception:
     whisper = None
 
-# Global cache for Whisper model
-_WHISPER_MODEL = None
+# Global cache — load once, reuse across reruns
+_WHISPER_MODEL: Optional[object] = None
 
 # --- Sentiment analysis ---
 try:
     from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+    _VADER = SentimentIntensityAnalyzer()
 except Exception:
-    SentimentIntensityAnalyzer = None
-
-
-# ------------------------------
-# MacOS text-to-speech
-# ------------------------------
-def macos_say(text: str) -> None:
-    try:
-        subprocess.run(["say", text], check=False)
-    except Exception:
-        pass
-
-
-# ------------------------------
-# Audio recording
-# ------------------------------
-class AudioRecorder:
-    """Non-blocking audio recorder for Streamlit sessions."""
-
-    def __init__(self, samplerate: int = 16000):
-        if sd is None or wav_write is None:
-            raise RuntimeError("sounddevice/scipy not available. Install them first.")
-        self.samplerate = int(samplerate)
-        self._stop_event = threading.Event()
-        self._lock = threading.Lock()
-        self._frames: List[np.ndarray] = []
-        self._thread: Optional[threading.Thread] = None
-        self._max_frames: Optional[int] = None
-
-    @property
-    def is_recording(self) -> bool:
-        return self._thread is not None and self._thread.is_alive()
-
-    def start(self, max_seconds: int = 30) -> None:
-        if self.is_recording:
-            return
-
-        self._stop_event.clear()
-        with self._lock:
-            self._frames = []
-        self._max_frames = int(max(1, max_seconds) * self.samplerate)
-
-        def _callback(indata, frames, time_info, status):
-            _ = (time_info, status)
-            if self._stop_event.is_set():
-                raise sd.CallbackStop()
-            with self._lock:
-                self._frames.append(indata.copy())
-                total = sum(x.shape[0] for x in self._frames)
-                if total >= self._max_frames:
-                    raise sd.CallbackStop()
-
-        def _run():
-            try:
-                with sd.InputStream(
-                    samplerate=self.samplerate,
-                    channels=1,
-                    dtype="float32",
-                    callback=_callback,
-                ):
-                    while not self._stop_event.is_set():
-                        time.sleep(0.05)
-            except Exception:
-                pass
-
-        self._thread = threading.Thread(target=_run, daemon=True)
-        self._thread.start()
-
-    def stop(self) -> Tuple[str, float]:
-        """Stop recording and return (wav_path, duration_seconds)."""
-        if not self.is_recording:
-            raise RuntimeError("Not recording.")
-
-        self._stop_event.set()
-        if self._thread is not None:
-            self._thread.join(timeout=5.0)
-
-        with self._lock:
-            if not self._frames:
-                raise RuntimeError("No audio captured. Check microphone/input device.")
-            audio = np.concatenate(self._frames, axis=0)
-
-        audio = np.squeeze(audio)
-        max_abs = np.max(np.abs(audio)) or 1.0
-        audio_int16 = (audio / max_abs * 32767.0).astype(np.int16)
-
-        tmp_wav = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-        tmp_wav_path = tmp_wav.name
-        tmp_wav.close()
-        wav_write(tmp_wav_path, self.samplerate, audio_int16)
-
-        duration = float(audio_int16.shape[0]) / float(self.samplerate)
-        return tmp_wav_path, duration
+    _VADER = None
 
 
 # ------------------------------
 # Load questions from JSON
 # ------------------------------
-def load_questions(dataset_path: str, category: Optional[str] = None, num_questions: int = 5) -> List[str]:
+def load_questions(
+    dataset_path: str,
+    category: Optional[str] = None,
+    num_questions: int = 5,
+) -> List[str]:
+    """Return a shuffled, truncated list of interview questions."""
     try:
         with open(dataset_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -158,39 +59,59 @@ def load_questions(dataset_path: str, category: Optional[str] = None, num_questi
 # ------------------------------
 # Transcribe audio using Whisper
 # ------------------------------
-def transcribe_with_whisper(audio_path: str, model_name: str = "small") -> str:
+def transcribe_with_whisper(audio_bytes: bytes, model_name: str = "small") -> str:
     """
-    Transcribe audio with Whisper. Model is cached globally to avoid reloads.
+    Transcribe raw audio bytes with Whisper.
+
+    Accepts raw bytes (e.g. from streamlit-mic-recorder) and writes
+    them to a temporary WAV file so Whisper can read them.
+    Model is cached globally to avoid reloads between questions.
     """
     global _WHISPER_MODEL
 
     if whisper is None:
-        raise RuntimeError("openai-whisper not available. Install it with `pip install openai-whisper`.")
+        raise RuntimeError(
+            "openai-whisper not installed. Add it to requirements.txt."
+        )
 
     if _WHISPER_MODEL is None:
         _WHISPER_MODEL = whisper.load_model(model_name)
 
-    result = _WHISPER_MODEL.transcribe(audio_path)
-    return result.get("text", "").strip()
+    # Write bytes to a temp file; Whisper needs a file path
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+        tmp.write(audio_bytes)
+        tmp_path = tmp.name
+
+    try:
+        result = _WHISPER_MODEL.transcribe(tmp_path)
+        return result.get("text", "").strip()
+    finally:
+        import os
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
 
 
 # ------------------------------
 # Speech analysis: WPM, fillers, tone
 # ------------------------------
-def analyze_speech(text: str, duration_seconds: float) -> Dict[str, float]:
+def analyze_speech(text: str, duration_seconds: float) -> Dict:
+    """Compute WPM, filler-word count, and VADER sentiment."""
     words = text.split()
     num_words = len(words)
     wpm = (num_words / duration_seconds) * 60.0 if duration_seconds > 0 else 0.0
 
     filler_words = {"um", "uh", "like", "you know", "so", "actually", "basically", "right"}
     lowered = text.lower()
-    filler_count = sum(len(re.findall(rf"\b{fw}\b", lowered)) for fw in filler_words)
+    filler_count = sum(
+        len(re.findall(rf"\b{fw}\b", lowered)) for fw in filler_words
+    )
 
     sentiment_score = 0.0
     sentiment_label = "neutral"
-    if SentimentIntensityAnalyzer is not None:
-        analyzer = SentimentIntensityAnalyzer()
-        vs = analyzer.polarity_scores(text)
+    if _VADER is not None:
+        vs = _VADER.polarity_scores(text)
         sentiment_score = vs.get("compound", 0.0)
         if sentiment_score >= 0.2:
             sentiment_label = "positive"
@@ -209,7 +130,8 @@ def analyze_speech(text: str, duration_seconds: float) -> Dict[str, float]:
 # ------------------------------
 # Generate feedback
 # ------------------------------
-def generate_feedback(metrics: Dict[str, float]) -> str:
+def generate_feedback(metrics: Dict) -> str:
+    """Rule-based feedback based on WPM, filler words, and sentiment."""
     wpm = metrics.get("wpm", 0.0)
     filler = int(metrics.get("filler_count", 0))
     sentiment = metrics.get("sentiment_label", "neutral")
@@ -226,7 +148,9 @@ def generate_feedback(metrics: Dict[str, float]) -> str:
 
     # Filler words feedback
     if filler > 5:
-        parts.append("There were many filler words; pause briefly instead of saying 'um' or 'like'.")
+        parts.append(
+            "There were many filler words; pause briefly instead of saying 'um' or 'like'."
+        )
     elif filler > 0:
         parts.append("A few filler words appeared; mindful pauses can make answers clearer.")
     else:
@@ -234,10 +158,42 @@ def generate_feedback(metrics: Dict[str, float]) -> str:
 
     # Tone feedback
     if sentiment == "negative":
-        parts.append("Your tone skewed negative; inject more confident, positive framing where possible.")
+        parts.append(
+            "Your tone skewed negative; inject more confident, positive framing where possible."
+        )
     elif sentiment == "positive":
         parts.append("Your tone sounded positive and engaged; keep it up.")
     else:
         parts.append("Tone was neutral; adding enthusiasm can increase engagement.")
 
     return " ".join(parts)
+
+
+# ------------------------------
+# Browser TTS via Web Speech API
+# ------------------------------
+def browser_tts_js(text: str) -> str:
+    """
+    Return a JavaScript snippet that speaks *text* using the browser's
+    built-in Web Speech API (SpeechSynthesis). Works on all modern
+    browsers and requires no server-side audio library.
+
+    Usage in Streamlit:
+        import streamlit.components.v1 as components
+        components.html(browser_tts_js("Hello world"), height=0)
+    """
+    # Escape single quotes so they don't break the JS string literal
+    safe_text = text.replace("'", "\\'").replace("\n", " ")
+    return f"""
+<script>
+(function() {{
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();          // stop any previous utterance
+  var u = new SpeechSynthesisUtterance('{safe_text}');
+  u.rate = 1.0;
+  u.pitch = 1.0;
+  u.lang = 'en-US';
+  window.speechSynthesis.speak(u);
+}})();
+</script>
+"""
